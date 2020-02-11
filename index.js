@@ -6,70 +6,80 @@ server.use(express.json());
 
 const projects = [];
 
-server.use((req, res, next) => {
-  console.time('Request');
-  console.log(`Método: ${req.method}; URL: ${req.url}`);
-
-  next();
-
-  console.timeEnd('Request');
-})
-
+// Middleware to see if the Project exists
 const checkProjectExists = (req, res, next) => {
-  if(!req.body.name) {
-    return res.status(400).json({ error: 'Project name is required' });
-  }
+  const { id } = req.params;
+  const project = projects.find(p => p.id == id);
 
-  return next();
-}
-
-const checkProjectInArray = (req, res, next) => {
-  const project = projects[req.params.index];
   if(!project) {
-    return res.status(400).json({ error: 'Project does not exists' });
+    return res.status(400).json({ error: 'Project not found' });
   }
-
-  req.project = project;
 
   return next();
 }
+
+// Middleware to count the number of requests
+const logRequests = (req, res, next) => {
+  console.count("Número de requisições");
+
+  return next();
+}
+
+server.use(logRequests);
 
 // List all Projects
 server.get('/projects', (req, res) => {
   return res.json(projects);
 });
 
-// Find a Project
-server.get('/projects/:index', checkProjectInArray, (req, res) => {
-  return res.json(req.project);
-});
-
 // Create Project
-server.post('/projects', checkProjectExists, (req, res) => {
-  const { name } = req.body;
+server.post('/projects', (req, res) => {
+  const { id, name } = req.body;
 
-  projects.push(name);
+  const project = {
+    id,
+    name,
+    tasks: []
+  };
 
-  return res.json(projects);
+  projects.push(project);
+
+  return res.json(project);
 });
 
 // Edit Project
-server.put('/projects/:index', checkProjectExists, checkProjectInArray, (req, res) => {
-  const { index } = req.params;
+server.put('/projects/:id', checkProjectExists, (req, res) => {
+  const { id } = req.params;
   const { name } = req.body;
 
-  projects[index] = name;
+  const project = projects.find(p => p.id == id);
 
-  return res.json(projects);
+  project.name = name;
+
+  return res.json(project);
 });
 
 // Delete Project
-server.delete('/projects/:index', (req, res) => {
-  const { index } = req.params;
+server.delete('/projects/:id', checkProjectExists, (req, res) => {
+  const { id } = req.params;
 
-  projects.splice(index, 1);
+  const projectIndex = projects.findIndex(p => p.id == id);
 
-  return res.json(projects);
+  projects.splice(projectIndex, 1);
+
+  return res.send();
+});
+
+// Add new Project Task
+server.post('/projects/:id/tasks', checkProjectExists, (req, res) => {
+  const { id } = req.params;
+  const { name } = req.body;
+
+  const project = projects.find(p => p.id == id);
+
+  project.tasks.push(name);
+
+  return res.json(project);
 });
 
 server.listen(3000);
